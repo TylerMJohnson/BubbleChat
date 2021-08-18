@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>BubbleChat</title>
+    <style>
+
+        .links line {
+            stroke: #000000;
+            stroke-opacity: 0.6;
+        }
+
+        .nodes circle {
+            stroke: #fff;
+            stroke-width: 1.5px;
+        }
+
+        text {
+            font-family: sans-serif;
+            font-size: 10px;
+        }
+
+        table,tr,th,td {
+            border: 1px solid black;
+            border-collapse: collapse;
+        }
+
+        th {
+            color: white;
+            background-color: grey;
+        }
+
+        td,th {
+            padding: 10px 5px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: row;
+        }
+
+        label {
+            width: 25%;
+        }
+
+        input[type=text] {
+              display: block;
+              width: 80%;
+        }
+        input[type=submit] {
+            display: block;
+            width: 20%;
+        }
+    </style>
+</head>
+<body>
+<svg id="svg" width="1200" height="600"></svg>
+
+Last 10 Messages Here:
+<div class="chatbox">
+    <ul id="messagelist"></ul>
+<form name="form" onsubmit="handleSubmit(event)">
+    <input type="text" id="textinput" name="string" placeholder="Type whatever you want here!">
+    <input type="submit" value="Submit">
+</form>
+    <br>
+</div>
+<table id="table">
+
+</table>
+</body>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js" integrity="sha512-eVL5Lb9al9FzgR63gDs1MxcDS2wFu3loYAgjIH0+Hg38tCS8Ag62dwKyH+wzDb+QauDpEZjXbMn11blw8cbTJQ==" crossorigin="anonymous"></script>
+<script>
+    var socket = io();
+    var thesvg = document.getElementById("svg");
+    thesvg.setAttribute("width",  window.innerWidth);
+    thesvg.setAttribute("height", (window.innerHeight - (window.innerHeight * .30)));
+
+    let graph = { nodes: [], links : [] }
+
+    //const svg = d3.select("svg").style("background-color", "gray"), width = +svg.attr("width"), height = +svg.attr("height")
+
+    var svg = d3.select("svg").style("background-color", "gray")
+        .attr("width", window.innerWidth)
+        .attr("height", (window.innerHeight - (window.innerHeight * .30)))
+        .call(d3.zoom().on("zoom", function() {
+            nodeGraph.attr("transform", d3.event.transform)
+            linkGraph.attr("transform", d3.event.transform)
+        }));
+
+    width = +svg.attr("width")
+    height = +svg.attr("height")
+
+    const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+    const simulation = d3.forceSimulation().alphaDecay(0.01)
+        .force("link", d3.forceLink().id(function(d) { return d.id; }).strength(0.002))
+        .force("charge", d3.forceManyBody().distanceMax(height/2).strength(-400))
+        .force("x", d3.forceX().x(width/2).strength(0.005))
+        .force("y", d3.forceY().y(height/2).strength(0.005))
+        .force("collide", d3.forceCollide().radius(function(d) {return d.radius + 5; }).strength(1));
+
+    var nodes;
+    var links;
+
+    const nodeGraph = svg.append("g").attr("class","nodes")
+    const linkGraph = svg.append("g").attr("class", "links")
+
+    update();
+
+    function update(){
+        nodes = nodeGraph.selectAll("g")
+            .data(graph.nodes);
+
+        nodes.exit()
+            .transition()
+            .attr("opacity",0)
+            .remove();
+
+        var newnodes = nodes.enter().append("g")
+            .attr("opacity", 0)
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended))
+
+        newnodes.transition()
+            .attr("opacity",1)
+            .attr("class", "nodes")
+
+        newnodes.append("circle")
+            .attr("r", function(d) { return (d.size * 2) + 1})
+            .attr("fill", function(d) { return color(d.color); })
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended))
+            .on("click", clicked);
+
+        newnodes.append("text")
+            .text(function(d) {  return d.id; })
+            .attr('x', 6)
+            .attr('y', 3)
+            .style("font-size", "30px");
+
+        newnodes.append("title")
+            .text(function(d) { return d.id; });
+
+        nodes.selectAll("circle").attr("r", function(d) { return (d.size * 2) + 1})
+
+        nodes = newnodes.merge(nodes);
+
+        links = linkGraph.selectAll("line")
+            .data(graph.links)
+
+        links.exit()
+            .transition()
+            .attr("opacity",0)
+            .remove();
+
+        var newlinks = links.enter()
+            .append("line")
+            .attr("stroke-width", function(d) { return Math.sqrt(d.value); });
+
+        newlinks
+            .attr("opacity", 0)
+            .transition()
+            .attr("opacity",1)
+
+        links = newlinks.merge(links);
+
+
+        simulation
+            .nodes(graph.nodes)
+            .on("tick", ticked)
+            .force("link").links(graph.links)
+
+        simulation.alpha(1).restart();
+
+    }
+
+    function ticked() {
+        links
+            .attr("x1", function(d) { return d.source.x; })
+            .attr("y1", function(d) { return d.source.y; })
+            .attr("x2", function(d) { return d.target.x; })
+            .attr("y2", function(d) { return d.target.y; });
+
+        nodes.attr("transform", function(d) {
+            return "translate(" + d.x + "," + d.y + ")";
+        })
+    }
+
+    function dragstarted(d) {
+        if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
+
+    function dragged(d) {
+        d.fx = d3.event.x;
+        d.fy = d3.event.y;
+    }
+
+    function dragended(d) {
+        if (!d3.event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+        simulation.alpha(1).restart();
+    }
+
+    async function clicked(event, d) {
+        if (event.defaultPrevented) return; // dragged
+        let text = graph.nodes[d].id;
+
+        const {data} = await axios.get('/words/chat', {
+            params: {
+                word: text
+            }
+        })
+
+        const result = data.map(({created_utc, text}) => {
+            return `<tr><td>${new Date(created_utc).toISOString()}</td><td>${text}</td></tr>`;
+        }).join("");
+
+        const table = document.createElement("table");
+        table.setAttribute("id", "table");
+        table.innerHTML = "<tr><th>Date</th><th>String</th></tr>";
+        table.innerHTML += result;
+        document.body.replaceChild(table, document.getElementById("table"));
+    }
+
+
+    function getRandomInt(min, max) {
+        min = Math.ceil(min);
+        max = Math.floor(max);
+        return Math.floor(Math.random() * (max - min) + min);
+    }
+
+    function handleSubmit(event){
+        event.preventDefault()
+        let formData = new FormData(event.target)
+        var string = document.getElementById("textinput").value.toLowerCase();
+        //addWordsToGraph(string)
+        var words = string.split(" ");
+        if(words.includes('')) {
+            alert("Double Space Is Not Allowed!");
+            document.form.reset();
+            return;
+        } else {
+            axios.post('/', {created_utc: new Date().toUTCString(), text: string}).then(function (response) {
+                console.log(response);
+            }).catch(function (error) {
+                console.log(error);
+            }).then(function () {
+                socket.emit('message', string);
+            });
+        }
+        document.form.reset();
+    }
+
+    let commonwords = [" ", "the","of","and","a","to","in","is",
+        "you","that","it","he","was","for","on","are","as","with","his","they","i",
+        "at","be","this","have","from","or","one","had","by","word","but","not","what",
+        "all","were","we","when","your","can","said","there","use","an","each","which",
+        "she","do","how","their","if","will","up","other","about","out","many","then",
+        "them","these","so","some","her","would","make","like","him","into","time","has",
+        "look","two","more","write","go","see","number","no","way","could","people","my",
+        "than","first","water","been","call","who","oil","its","now","find","long","down",
+        "day","did","get","come","made","may","part", "just", "why", "thats", "gonna", "im",
+        "should", "hes", "me", "know", "only", "got", "doing", "us", "gets", "want", "ive", "any", "let"];
+
+    function addWordsToGraph(string){
+        var words = string.split(" ");
+        var cleaned = []
+        if(words.includes('')){
+            alert("Double Space Is Not Allowed!");
+            return;
+        }
+        //console.log(words); //hey there
+        for(var i = 0; i < words.length; i++){
+            var item = words[i]
+            var triggered = false;
+            for(var x = 0; x < commonwords.length; x++){
+               // console.log("item " + item + " vs " + commonwords[x]);
+                if(item === commonwords[x]){
+                    words[i] = ""
+                    triggered = true
+                }
+            }
+            if(!triggered){
+                cleaned.push(item)
+            }
+        }
+        for(var i = 0; i < words.length; i++){
+            var item = words[i]
+            if(item === ""){
+                //console.log("found one")
+                continue;
+            }
+            var triggered = false;
+            for(var n = 0; n < graph.nodes.length; n++){
+                if (graph.nodes[n].id == item){
+                    //console.log("adding to size 10");
+                    graph.nodes[n].size += 10;
+                    triggered = true;
+                }
+            }
+            if (!triggered) {
+                graph.nodes.push({"id": item, "group": 1, color: Math.floor(Math.random()*10), "size": 5, x: (Math.random() * width), y: (Math.random() * height)});
+            }
+        }
+        if(cleaned.length > 1){
+          //  console.log(cleaned)
+          //  console.log(cleaned[0])
+           // console.log(cleaned[1])
+            for(var i = 1; i < cleaned.length; i++){
+                var from = cleaned[i-1];
+                var to = cleaned[i];
+                graph.links.push({"source": from , "target": to, "value": 1})
+            }
+
+        }
+        update();
+    }
+
+    socket.on('connect', function(data) {
+        socket.emit('join', 'Hello World from client');
+    });
+    socket.on('load', function(data) {
+        for(var i = 0; i < data.length; i++){
+            addWordsToGraph(data[i].text);
+            var item = document.createElement('li');
+            item.textContent = data[i].text;
+            messages.appendChild(item);
+            if(messages.children.length > 9){
+                messages.removeChild(messages.getElementsByTagName('li')[0]);
+            }
+        }
+        console.log(data);
+    });
+    var messages = document.getElementById('messagelist');
+    socket.on('message', function(data) {
+        var item = document.createElement('li');
+        item.textContent = data;
+        messages.appendChild(item);
+        if(messages.children.length > 9){
+            messages.removeChild(messages.getElementsByTagName('li')[0]);
+        }
+        addWordsToGraph(data);
+    });
+</script>
+</html>

@@ -1,0 +1,10 @@
+extends layout
+
+block content
+  h1= title
+  p Welcome to #{title} feel free to type anything you want!
+
+  form(action='/add_message', method='POST')
+     p
+       input(type='text', name='message', placeholder='type here')
+     input(type='submit', value='Submit')
