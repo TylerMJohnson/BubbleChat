@@ -11,6 +11,12 @@ A simple Express RESTFul API was created to POST and GET comments.
 Socket.io was also used to broadcase messages to other connected clients.
 The data collection portion of this project can be found at https://github.com/TylerMJohnson/BubbleChatDataCollection
 
+
+
+
+
+
+
 **Suggested Improvements***
 **1.** D3.js custom tick method to calculate node positioning. The simulation parameters contradict themselves and the graph produced is not exactly what was envisioned. Ideally bigger nodes should go to the middle and smaller nodes on the outside. No nodes should overlap.
 
