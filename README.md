@@ -3,8 +3,10 @@
 Combined graph theory with a console that users can type and submit messages. These chat messages will generate a graph where each node is a word, and each edge is the space between words. The size of the node is determined by occurrences or frequency of input. Therefore, words with more frequency create a larger node and words with less frequency will have a smaller node. Users can click on nodes to browse the chat messages that contain that word.  
 
 **How to start:**  
-Run app.js and load in your browser http://localhost:3000/chat  
-or http://localhost:3000/chat1  
+Run app.js and load in your browser  
+http://localhost:3000/chat   
+or  
+http://localhost:3000/chat1   
 Note: if you do load chat1, you should remove the edges which can be found in bubblechat1.html  
 
 A simple Express RESTFul API was created to POST and GET comments.  
@@ -17,7 +19,7 @@ The data collection portion of this project can be found at https://github.com/T
   
   
   
-**Suggested Improvements***  
+**Suggested Improvements**
 **1.** D3.js custom tick method to calculate node positioning. The simulation parameters contradict themselves and the graph produced is not exactly what was envisioned. Ideally bigger nodes should go to the middle and smaller nodes on the outside. No nodes should overlap.  
 
 **2.** Decay functionality. Have nodes decay over time based on how many messages are inputted and the amount of concurrent connected users. This will allow for the focus of the conversation to easily change over time. The flaw at this time is that if a word is extremely popular in the morning like “morning” it will dominate the conversation and still be enormous later into the day.  
